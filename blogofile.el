@@ -13,7 +13,10 @@
   "We copy org files here.")
 
 (defvar bf-image-directory (concat bf-root-dir "img/")
-  "Directory where all images are stored.")
+  "Directory where all images are stored. as of 9/29/2013 this is not used anymore")
+
+(defvar bf-media-directory (concat bf-root-dir "media/")
+  "Directory where all media are stored. as of 9/29/2013 all images are stored in here")
 
 (defvar bf-posts-directory (concat bf-root-dir "_posts/")
   "Directory where all html versions of posts are stored.")
@@ -23,6 +26,9 @@
 
 (defvar bf-image-url-base "/img/"
   "Base url where images are found")
+
+(defvar bf-media-url-base "/media/"
+  "Base url where media (files linked to including images, data, etc...) are found")
 
 (defun bf-get-post-title ()
   "return title property or heading of current section with
@@ -78,45 +84,102 @@ all keys and values are taken from properties."
 	       "" "" "")
 	     "\n"))
 
-(defun bf-get-HTML () 
-  "use the new org export mechanism to get html string with corrected image links. This function does not save the post!
-
-the creates a buffer *Org HTML Export* with the content in it."
+(defun bf-get-post-media-folder ()
+  "compute media folder name, create it if needed, and return the path"
   (interactive)
-  ;; temporarily replace org-html-format-inline-image so it puts the
-  ;; right links to images in. in the blog, the link is a full URL, not a path
-  (flet ((org-html--format-image 
-	  (src attribures info)
-	  (progn
-	    ;; src contains the image filename
-	    ;; copy image to images/src
-	    (let ((file src)
-		  (newname (concat bf-image-directory src))
-		  (ok-if-already-exists t))
-	      ;; create parent directories
-	      (when (not (file-directory-p (file-name-directory newname)))
-		(message (format 
-			  "%s does not exist. Making it!" 
-			  (file-name-directory newname)))
-		(make-directory (file-name-directory newname) t))
-	      (copy-file file newname ok-if-already-exists))
-		
-	    ;; construct url that is returned
-	    (format "<p><img src=\"%s\"><p>" (concat bf-image-url-base src)))))
-	  
-    ;; body in flet with temporary image function
-    (let ((async nil)
-	  (subtreep t)
-	  (visible-only nil)
-	  (body-only t)
-	  (ext-plist '()))
-      (org-html-export-as-html async subtreep visible-only body-only ext-plist)))
-  ;; now switch to the *Org HTML Export* buffer and get the string
-  (setq cb (current-buffer))
-  (set-buffer "*Org HTML Export*")
-  (setq output (buffer-string))
-  (set-buffer cb)
-  (format "%s" output))
+  (if (org-entry-get nil "date")
+      (setq date (org-entry-get nil "date")) ; then
+    ;; if there is no date property, we set date to current date and set the property
+    (progn                                   ; else
+      (setq date (format-time-string "%Y/%m/%d %H:%M:%S"))
+      (org-entry-put nil "date" date)))
+  
+  ;; we need to get the title
+  (setq title (bf-get-post-title))
+    
+  ;; construct the directory to save in
+  (setq post-dir (format "%s" (concat (mapconcat 'identity (bf-parse-date date) "-")
+                                 "-" 
+                                 (mapconcat 'identity (split-string title) "-")
+                                 "/")))
+
+  (setq media-dir (format "%s" (concat bf-media-directory post-dir)))
+  (setq media-url (format "%s" (concat bf-media-url-base post-dir)))
+  
+
+  (make-directory media-dir t) ; make if needed
+  `(,media-dir ,media-url))
+
+
+(defun bf-get-link-urls ()
+  "Parse the org-buffer and generate a list of urls for each link. Copy files as needed to where they need to go. Return the list of urls."
+  (org-narrow-to-subtree)
+  (let* ((parsetree (org-element-parse-buffer))
+        (counter 0)
+        (MD (bf-get-post-media-folder))
+        (media-dir (nth 0 MD))
+        (media-url (nth 1 MD)))
+    ;; parse tree
+    (setq url-list (org-element-map parsetree 'link
+      (lambda (link) 
+        (let* ((type (nth 0 link))
+               (plist (nth 1 link))
+               (content (nth 2 link))
+               (path (plist-get plist :path))
+               (type (plist-get plist ':type))
+               (fname (car (last (split-string path "/")))))
+          ;; construct urls for different types of links
+          (cond
+           ;; image
+           ((and (string= type "file")
+                 (string-match "png" (file-name-extension fname))) 
+            (progn 
+              (copy-file path (concat media-dir fname) t)
+              (format "<img src=\"%s%s\">" media-url fname)))
+           ;; regular file with content
+           ((and (string= type "file")  content)
+            (progn (copy-file path (concat media-dir fname) t)
+                   (format "<a href=\"%s%s\">%s</a>" media-url fname content)))
+           ;; regular file with no content
+           ((and (string= type "file"))
+            (progn (copy-file path (concat media-dir fname) t)
+                   (format "<a href=\"%s%s\">%s</a>" media-url fname fname)))
+           ;; URLS with content
+           ((and (string-match "http" type) content)
+            (format "<a href=\"%s\">%s</a>" (plist-get plist :raw-link) content))
+           ;; urls with no content
+           ((string-match "http" type)
+            (format "<a href=\"%s\">%s</a>" (plist-get plist :raw-link) (plist-get plist :raw-link)))
+
+           ;; all other links will be formatted as <pre> blocks on the raw link
+           (t (format "<pre>%s</pre>" (plist-get plist :raw-link))))))))
+    (widen)
+    url-list))
+
+
+(defun ox-mrkup-filter-link (text back-end info)
+  "filter links to return the URLs I need for blogofile. You need to have created bf-link-counter and url-list"
+  (let ((url (nth  bf-link-counter url-list)))
+    (setq output   (format "%s" url))
+    ;; increment counter
+    (setq bf-link-counter (+ bf-link-counter 1))
+    output))
+
+(defun bf-get-HTML () 
+  (org-narrow-to-subtree)
+  (let ((org-export-filter-link-functions '(ox-mrkup-filter-link))
+        (async nil)
+        (subtreep t)
+        (visible-only nil)
+        (body-only t)
+        (ext-plist '())
+        (bf-link-counter 0)
+        (url-list (bf-get-link-urls)))
+    (org-html-export-as-html async subtreep visible-only body-only ext-plist))
+  (widen)
+  ; now get the output into the org output
+  (switch-to-buffer "*Org HTML Export*")
+  (buffer-string))
 
 (defun bf-get-post-html ()
   "Return a string containing the YAML header, the post html, my copyright line, and a link to the org-source code."
@@ -251,6 +314,7 @@ would lead to this post filename
   (interactive)
   ;; we have to get all data before we put the post together. these
   ;; functions all rely on point being in an org section
+  (org-narrow-to-subtree)
   (setq thisb (current-buffer))
   (setq post-filename (bf-get-post-filename))
   (org-entry-put nil "updated" (format-time-string "%Y/%m/%d %H:%M:%S"))
@@ -262,7 +326,8 @@ would lead to this post filename
   ;; clean up
   (kill-buffer "*Org HTML Export*")
   (switch-to-buffer thisb)
-  (delete-other-windows))
+  (delete-other-windows)
+  (widen))
 
 
 (global-set-key [f10] 'bf-blogpost)
