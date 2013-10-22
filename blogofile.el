@@ -87,6 +87,7 @@ all keys and values are taken from properties."
 (defun bf-get-post-media-folder ()
   "compute media folder name, create it if needed, and return the path"
   (interactive)
+  (message "making media folder")
   (if (org-entry-get nil "date")
       (setq date (org-entry-get nil "date")) ; then
     ;; if there is no date property, we set date to current date and set the property
@@ -128,32 +129,33 @@ all keys and values are taken from properties."
                (path (plist-get plist :path))
                (type (plist-get plist ':type))
                (fname (car (last (split-string path "/")))))
+          (message (format "type=%s  content=%s path=%s fname=%s" type content path fname))
           ;; construct urls for different types of links
           (cond
            ;; image
-           ((and (string= type "file")
-                 (string-match "png" (file-name-extension fname))) 
+           ((and (string= type "file") (file-name-extension fname) (string-match "png" (file-name-extension fname))) 
             (progn 
               (copy-file path (concat media-dir fname) t)
-              (format "<img src=\"%s%s\">" media-url fname)))
+              (format "<img src=\"%s%s\"> " media-url fname)))
            ;; regular file with content
            ((and (string= type "file")  content)
             (progn (copy-file path (concat media-dir fname) t)
-                   (format "<a href=\"%s%s\">%s</a>" media-url fname content)))
+                   (format "<a href=\"%s%s\">%s</a> " media-url fname content)))
            ;; regular file with no content
-           ((and (string= type "file"))
+           ((string= type "file")
             (progn (copy-file path (concat media-dir fname) t)
-                   (format "<a href=\"%s%s\">%s</a>" media-url fname fname)))
+                   (format "<a href=\"%s%s\">%s</a> " media-url fname fname)))
            ;; URLS with content
            ((and (string-match "http" type) content)
-            (format "<a href=\"%s\">%s</a>" (plist-get plist :raw-link) content))
+            (format "<a href=\"%s\">%s</a> " (plist-get plist :raw-link) content))
            ;; urls with no content
            ((string-match "http" type)
-            (format "<a href=\"%s\">%s</a>" (plist-get plist :raw-link) (plist-get plist :raw-link)))
+            (format "<a href=\"%s\">%s</a> " (plist-get plist :raw-link) (plist-get plist :raw-link)))
 
            ;; all other links will be formatted as <pre> blocks on the raw link
-           (t (format "<pre>%s</pre>" (plist-get plist :raw-link))))))))
+           (t (format "<pre>%s</pre> " (plist-get plist :raw-link))))))))
     (widen)
+    (message "done with url-list")
     url-list))
 
 
