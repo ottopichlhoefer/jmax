@@ -59,12 +59,27 @@
 
 (require 'reftex-cite)
 
+(defun jorg-bib/upload-bibtex-entry-to-citeulike ()
+  "with point in  a bibtex entry get bibtex string and submit to citeulike.
+
+Relies on the python script /upload_bibtex_citeulike.py being in the personal prelude directory."
+  (interactive)
+  (save-restriction
+    (bibtex-narrow-to-entry)
+    (let ((startpos (point-min))
+          (endpos (point-max))
+          (bibtex-string (buffer-string))
+          (script (concat "python " prelude-personal-dir "/upload_bibtex_citeulike.py")))
+      (with-temp-buffer (insert bibtex-string)
+                        (shell-command-on-region (point-min) (point-max) script t nil nil t)))))
+
 (defun open-bibtex-notes ()
   "from a bibtex entry, open the notes if they exist, and create a heading if they do not.
 
-I never did figure out how to use reftex to make this happen non-interactively. the reftex-format-citation function did not work perfectly; there were carriage returns in teh strings, and it did not put the key where it needed to be. so, below I replace the carriage returns and extra spaces with a single space and construct the heading by hand."
+I never did figure out how to use reftex to make this happen non-interactively. the reftex-format-citation function did not work perfectly; there were carriage returns in the strings, and it did not put the key where it needed to be. so, below I replace the carriage returns and extra spaces with a single space and construct the heading by hand."
   (interactive)
   (save-excursion
+    ;(jorg-bib/upload-bibtex-entry-to-citeulike) ; upload to citeulike. a little slow
     (bibtex-beginning-of-entry)
     ;; get the key. It should be everything between { and ,  
     (re-search-forward "{\\([^,].*\\),") 
@@ -95,7 +110,7 @@ I never did figure out how to use reftex to make this happen non-interactively. 
     (goto-char (point-min))
     ; put new entry in notes if we don't find it.
     (unless (re-search-forward (format ":Custom_ID: %s$" key) nil 'end)
-      (insert (format "** TODO %s - %s" year title))
+      (insert (format "\n** TODO %s - %s" year title))
       (insert (format"
  :PROPERTIES:
   :Custom_ID: %s
@@ -280,7 +295,8 @@ key author journal year volume pages key key)))))
     (search-forward link-string nil t 1)
     (setq link-string-beginning (match-beginning 0))
     (setq link-string-end (match-end 0)))
-  ;; now we want to search forward to next comma from point, which defines the end character of the key
+  ;; now we want to search forward to next comma from point, which
+  ;; defines the end character of the key
   (save-excursion
     (if (search-forward "," link-string-end t 1)
 	(setq key-end (- (match-end 0) 1)) ; we found a match
@@ -303,7 +319,11 @@ key author journal year volume pages key key)))))
 	(setq bib-file (loop for file in cite-bibliography-files do
 			     (if (cite-key-in-file-p bibtex-key file) (return file))))))
   ;; and finally, open the file at the key
-  (cite-goto-bibentry bib-file bibtex-key))
+  (cite-goto-bibentry bib-file bibtex-key)
+  (recenter-top-bottom 1)
+
+  ;; if you right clicked, open the pdf. point is in the bibtex entry.
+  (if (eq (car last-input-event) 'mouse-3) (open-bibtex-pdf)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; cite links
@@ -426,3 +446,7 @@ key author journal year volume pages key key)))))
      (format ""))
     ((eq format 'latex)
      (format "\\index{%s}" keyword)))))
+
+(provide 'jorg-bib)
+;;; jorg-bib.el ends here
+
