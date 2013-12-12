@@ -67,31 +67,32 @@
   :options-alist '())
 
 (defun org-json-template (body info)
-  (format "{<template>%s</template>}" body))
+  "this encloses the document in braces"
+  (format "{%s}" body))
 
 (defun org-json-headline (headline contents info)
-  (format "{:headline: %s %s}" (org-element-property :raw-value headline) contents))
+  (format "{headline: %s contents:{%s}}" (org-element-property :raw-value headline) contents))
 
 (defun org-json-section (section contents info)
-  (format "{:section: %s}" contents))
+  (format "{section:%s}" contents))
 
 (defun org-json-italic (element contents info)
-  (format "{\":italic\": \"%s\"}" contents))
+  (format "{italic:%s}" contents))
 
 (defun org-json-link (link contents info)
-  (format "{:link: {:type:%s, :path:%s}" 
+  (format "{link:{type:%s, path:%s}" 
           (org-element-property :type link)
           (org-element-property :path link)))
 
 (defun org-json-bold (element contents info)
   "convert bold text to a json element"
-  (format "{\":bold\": \"%s\"}" contents))
+  (format "{bold:%s}" contents))
 
 (defun org-json-plain-text (contents info)
-  (format "{\"%s\"}" contents))
+  (format "{%s}" contents))
 
 (defun org-json-paragraph (element contents info)
-  (format "{\":par: \"%s\"}" contents))
+  (format "{paragraph:%s}" contents))
 
 (defun org-json-export-as-json (&optional async subtreep visible-only body-only ext-plist)
   "Export current buffer as a json buffer"
