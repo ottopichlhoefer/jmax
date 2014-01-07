@@ -1,6 +1,26 @@
 ;; Lisp code to setup bibliographycite, ref and label org-mode links.
 ;; also sets up reftex for org-mode
 
+(defgroup jorg-bib nil
+  "customization group for jorg-bib")
+
+(defcustom jorg-bib-bibliography-notes
+  nil
+  "path to where you will put all your notes about an entry in
+  the default bibliography."
+  :group 'jorg-bib)
+
+(defcustom jorg-bib-default-bibliography
+  nil
+  "list of bibtex files to search for."
+  :group 'jorg-bib)
+
+(defcustom jorg-bib-pdf-directory
+  nil
+  "directory where pdfs are stored by key. put a trailing / in"
+  :group 'jorg-bib)
+
+
 ;; variables that control bibtex key format for auto-generation
 ;; I want firstauthor-year-title-words
 ;; this usually makes a legitimate filename to store pdfs under.
@@ -8,7 +28,7 @@
       bibtex-autokey-name-year-separator "-"
       bibtex-autokey-year-title-separator "-"
       bibtex-autokey-titleword-separator "-"
-      bibtex-autokey-titlewords 2 
+      bibtex-autokey-titlewords 2
       bibtex-autokey-titlewords-stretch 1
       bibtex-autokey-titleword-length 5)
 
@@ -20,8 +40,6 @@
          (reftex-parse-all))
     (make-local-variable 'reftex-cite-format)
     (setq reftex-cite-format 'org)
-    (make-local-variable 'reftex-default-bibliography)
-    (setq reftex-default-bibliography '("~/Dropbox/bibliography/references.bib"))
     (define-key org-mode-map (kbd "C-c ]") 'reftex-citation))
 
 (add-hook 'org-mode-hook 'org-mode-reftex-setup)
@@ -45,14 +63,16 @@
 
 ; " ; silly line to keep font highlighting working. apparently the previous code confuses the string boundaries.
 
+
 (defun open-bibtex-pdf ()
-  "open pdf for a bibtex entry, if it exists. assumes point is in the entry of interest. but does not check that."
+  "open pdf for a bibtex entry, if it exists. assumes point is in
+the entry of interest. but does not check that."
   (interactive)
   (bibtex-beginning-of-entry)
-  ;; get the key. It should be everything between { and ,  
+  ;; get the key. It should be everything between { and ,
   (re-search-forward "{\\([^,].*\\),") ; get the key
   ;; it would also be nice to add a field with the path if it doesn't exist
-  (let ((pdf (format "bibtex-pdfs/%s.pdf" (match-string 1))))
+  (let ((pdf (format (concat jorg-bib-pdf-directory "%s.pdf" (match-string 1)))))
     (if (file-exists-p pdf)
       (org-open-link-from-string (format "[[file:%s]]" pdf))
       (ding))))
@@ -64,54 +84,55 @@
 
 Relies on the python script /upload_bibtex_citeulike.py being in the personal prelude directory."
   (interactive)
+  (message "uploading to citeulike")
   (save-restriction
     (bibtex-narrow-to-entry)
     (let ((startpos (point-min))
           (endpos (point-max))
           (bibtex-string (buffer-string))
-          (script (concat "python " prelude-personal-dir "/upload_bibtex_citeulike.py")))
+          (script (concat "python " prelude-personal-dir "/upload_bibtex_citeulike.py&")))
       (with-temp-buffer (insert bibtex-string)
                         (shell-command-on-region (point-min) (point-max) script t nil nil t)))))
 
 (defun open-bibtex-notes ()
   "from a bibtex entry, open the notes if they exist, and create a heading if they do not.
 
-I never did figure out how to use reftex to make this happen non-interactively. the reftex-format-citation function did not work perfectly; there were carriage returns in the strings, and it did not put the key where it needed to be. so, below I replace the carriage returns and extra spaces with a single space and construct the heading by hand."
+I never did figure out how to use reftex to make this happen
+non-interactively. the reftex-format-citation function did not
+work perfectly; there were carriage returns in the strings, and
+it did not put the key where it needed to be. so, below I replace
+the carriage returns and extra spaces with a single space and
+construct the heading by hand."
   (interactive)
-  (save-excursion
-    ;(jorg-bib/upload-bibtex-entry-to-citeulike) ; upload to citeulike. a little slow
-    (bibtex-beginning-of-entry)
-    ;; get the key. It should be everything between { and ,  
-    (re-search-forward "{\\([^,].*\\),") 
-    (setq key (match-string-no-properties 1))
-    )
-  (bibtex-beginning-of-entry)
-  (let* ((cb (current-buffer))
-	 (bibtex-expand-strings t)
-	 (entry (bibtex-parse-entry t))
-	 (title (replace-regexp-in-string "\n\\|\t\\|\s+" " " (reftex-get-bib-field "title" entry)))
-	 (year  (reftex-get-bib-field "year" entry))
-	 (author (replace-regexp-in-string "\n\\|\t\\|\s+" " " (reftex-get-bib-field "author" entry)))
-	 (key (reftex-get-bib-field "=key=" entry))
-	 (journal (reftex-get-bib-field "journal" entry))
-	 (volume (reftex-get-bib-field "volume" entry))
-	 (pages (reftex-get-bib-field "pages" entry)))
-	 
-	 ;; i am not crazy about this way to get the format string, but
-	 ;; it seems better than hard coding it. i is basically the ?h option
-	 ;; (format (cdr (nth 1 (nth 2 (car reftex-cite-format-builtin)))))
-	 ;(format nil)
-	;(heading (reftex-format-citation entry format)))
-	;(stripped-heading (replace-regexp-in-string "\n" "" heading)))
-      
-    ; now look for entry
-    (find-file "~/Dropbox/bibliography/notes.org")
+  (if (eq major-mode 'bibtex-mode)
+      (progn
+        (save-excursion
+          (jorg-bib/upload-bibtex-entry-to-citeulike) ; upload to citeulike. a little slow
+          (bibtex-beginning-of-entry)
+          ;; get the key. It should be everything between { and ,
+          (re-search-forward "{\\([^,].*\\),")
+          (setq key (match-string-no-properties 1))
+          )
+        (bibtex-beginning-of-entry)
+        (let* ((cb (current-buffer))
+               (bibtex-expand-strings t)
+               (entry (bibtex-parse-entry t))
+               (title (replace-regexp-in-string "\n\\|\t\\|\s+" " " (reftex-get-bib-field "title" entry)))
+               (year  (reftex-get-bib-field "year" entry))
+               (author (replace-regexp-in-string "\n\\|\t\\|\s+" " " (reftex-get-bib-field "author" entry)))
+               (key (reftex-get-bib-field "=key=" entry))
+               (journal (reftex-get-bib-field "journal" entry))
+               (volume (reftex-get-bib-field "volume" entry))
+               (pages (reftex-get-bib-field "pages" entry)))
 
-    (goto-char (point-min))
-    ; put new entry in notes if we don't find it.
-    (unless (re-search-forward (format ":Custom_ID: %s$" key) nil 'end)
-      (insert (format "\n** TODO %s - %s" year title))
-      (insert (format"
+                                        ; now look for entry
+          (find-file jorg-bib-bibliography-notes)
+
+          (goto-char (point-min))
+                                        ; put new entry in notes if we don't find it.
+          (unless (re-search-forward (format ":Custom_ID: %s$" key) nil 'end)
+            (insert (format "\n** TODO %s - %s" year title))
+            (insert (format"
  :PROPERTIES:
   :Custom_ID: %s
   :AUTHOR: %s
@@ -121,8 +142,8 @@ I never did figure out how to use reftex to make this happen non-interactively. 
   :PAGES: %s
  :END:
 [[cite:%s]] [[file:~/Dropbox/bibliography/bibtex-pdfs/%s.pdf][pdf]]\n\n"
-key author journal year volume pages key key)))))
-  ;(org-open-link-from-string (format "[[file:notes.org::#%s]]" (match-string 1))))
+key author journal year volume pages key key)))))))
+;; " weird font lock issue
 
 ; (reftex-citation nil 'h)
 (global-set-key [f11] 'open-bibtex-notes)
@@ -137,7 +158,7 @@ key author journal year volume pages key key)))))
 (org-add-link-type "bibliography"
 		   ;; this code is run on clicking. The bibliography
 		   ;; may contain multiple files. this code finds the
-		   ;; one you clicked on and opens it. 
+		   ;; one you clicked on and opens it.
 		   (lambda (link-string)
 		     (message (format "link-string = %s" link-string))
 		     (save-excursion
@@ -162,7 +183,7 @@ key author journal year volume pages key key)))))
 			 (setq key-beginning (point)))) ; no match found
 		     ;; save the key we clicked on.
 		     (setq bibfile (cite-strip-key (buffer-substring key-beginning key-end)))
-		     (message (format "bibfile = %s" bibfile))		     
+		     (message (format "bibfile = %s" bibfile))
 		     (find-file bibfile)) ; open file on click
 		   ;; formatting code
 		   (lambda (keyword desc format)
@@ -173,7 +194,7 @@ key author journal year volume pages key key)))))
 		       (format "\\bibliography{%s}" (replace-regexp-in-string  ".bib" "" keyword))))))
 
 (org-add-link-type "bibliographystyle"
-		   (lambda (arg) (message "Nothing implemented for clicking here.")) 
+		   (lambda (arg) (message "Nothing implemented for clicking here."))
 		   (lambda (keyword desc format)
 		     (cond
 		      ((eq format 'latex)
@@ -212,7 +233,7 @@ key author journal year volume pages key key)))))
  "label"
  (lambda (label)
    "on clicking count the number of label tags used in the buffer. A number greater than one means multiple labels!"
-   (message (format "%s occurences" 
+   (message (format "%s occurences"
 		    (+ (count-matches (format "label:%s\\b" label) (point-min) (point-max) t)
 		       (count-matches (format "\\label{%s}\\b" label) (point-min) (point-max) t)
 		       (count-matches (format "#\\+label:%s\\b" label) (point-min) (point-max) t)))))
@@ -232,6 +253,7 @@ key author journal year volume pages key key)))))
   (interactive)
   (save-excursion
     (goto-char (point-min))
+    ;;  look for a bibliography link
     (re-search-forward "bibliography:\\([^\]\|\n]+\\)" nil t)
     (if (match-string 1) ; we found a link
 	(setq cite-bibliography-files
@@ -244,12 +266,17 @@ key author journal year volume pages key key)))))
 	    (setq cite-bibliography-files
 		  (mapcar 'cite-strip-key (split-string (match-string 1) ",")))
 	 ; we did not find a raw latex bibliography. look for bibitems
-	 (progn 
+	 (progn
 	   (message "no \\bibliography found")
 	   (goto-char (point-min))
 	   (re-search-forward "\\(bibitem\\)" nil t)
 	   (if (match-string 1) (setq cite-bibliography-files "internal")
-	     (message "no bibitems found")))))))
+             ; no internal bibliography found. now we use the default setting
+             ; from the user
+             (progn
+               (message "no bibitems found")
+               (setq cite-bibliography-files jorg-bib-default-bibliography)
+               (message "cite-bibliography-files = %s" cite-bibliography-files))))))))
   (message "cite-bibliography-files = %s" cite-bibliography-files)
   cite-bibliography-files)
 
@@ -290,6 +317,7 @@ key author journal year volume pages key key)))))
   ;; First we find the boundaries of the link you clicked on, then
   ;; identify the key you clicked on. First get boundaries of the link-string
   (message "\n\nyou clicked on %s" link-string)
+  (message "%s" last-input-event)
   (save-excursion
     (search-backward "cite:")
     (search-forward link-string nil t 1)
@@ -309,21 +337,31 @@ key author journal year volume pages key key)))))
   ;; save the key we clicked on.
   (setq bibtex-key (cite-strip-key (buffer-substring key-beginning key-end)))
   (message (format "found bibtex key: %s" bibtex-key))
-  ;; now we get the bibliography files
-  (setq cite-bibliography-files (cite-find-bibliography))
-  (message "cite-bibliography-files = %s" cite-bibliography-files)
-  ;; now find the first bib file containing the key if it is a file
-  (if (not (equal cite-bibliography-files "internal"))
-      (progn
-	(message "checking files")
-	(setq bib-file (loop for file in cite-bibliography-files do
-			     (if (cite-key-in-file-p bibtex-key file) (return file))))))
-  ;; and finally, open the file at the key
-  (cite-goto-bibentry bib-file bibtex-key)
-  (recenter-top-bottom 1)
+  (message "%s" last-input-event)
+  (let ((button (car last-input-event)))
+    (cond ((eq button 'mouse-2) 
+           ;; now we get the bibliography files
+           (setq cite-bibliography-files (cite-find-bibliography))
+           (message "cite-bibliography-files = %s" cite-bibliography-files)
+           ;; now find the first bib file containing the key if it is a file
+           (if (not (equal cite-bibliography-files "internal"))
+               (progn
+                 (message "checking files")
+                 (setq bib-file (loop for file in cite-bibliography-files do
+                                      (if (cite-key-in-file-p bibtex-key file) (return file))))))
+           ;; and finally, open the file at the key
+           (cite-goto-bibentry bib-file bibtex-key)
+           (recenter-top-bottom 1))
 
-  ;; if you right clicked, open the pdf. point is in the bibtex entry.
-  (if (eq (car last-input-event) 'mouse-3) (open-bibtex-pdf)))
+          ;; if you right clicked, open the pdf. point is in the bibtex entry.
+          ((eq button 'mouse-3) 
+               (let ((pdf (format (concat jorg-bib-pdf-directory "%s.pdf") bibtex-key)))
+                 (if (file-exists-p pdf)
+                     (org-open-link-from-string (format "[[file:%s]]" pdf))
+                   (message "%s not found" pdf)
+                   (ding)))))))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; cite links
@@ -337,7 +375,7 @@ key author journal year volume pages key key)))))
    (cond
     ((eq format 'html) (format "(<cite>%s</cite>)" path))
     ((eq format 'latex)
-     (concat "\\cite{" 
+     (concat "\\cite{"
 	     (mapconcat (lambda (key) key) (cite-split-keys keyword) ",")
 	     "}")))))
 
@@ -349,7 +387,7 @@ key author journal year volume pages key key)))))
    (cond
     ((eq format 'html) (format "(<citealp>%s</citealp>)" path))
     ((eq format 'latex)
-     (concat "\\citealp{" 
+     (concat "\\citealp{"
 	     (mapconcat (lambda (key) key) (cite-split-keys keyword) ",")
 	     "}")))))
 
@@ -373,7 +411,7 @@ key author journal year volume pages key key)))))
     ((eq format 'latex)
   (concat "\\citet*{" (mapconcat (lambda (key) key) (cite-split-keys keyword) ",") "}")))))
 
-;; TODO these links do not support options [see][] 
+;; TODO these links do not support options [see][]
 (org-add-link-type
  "citep"
  'cite-onclick
@@ -449,4 +487,3 @@ key author journal year volume pages key key)))))
 
 (provide 'jorg-bib)
 ;;; jorg-bib.el ends here
-
