@@ -113,7 +113,9 @@ all keys and values are taken from properties."
 
 
 (defun bf-get-link-urls ()
-  "Parse the org-buffer and generate a list of urls for each link. Copy files as needed to where they need to go. Return the list of urls."
+  "Parse the org-buffer and generate a list of urls for each link. Copy files as needed to where they need to go. Return the list of urls. This does not work for urls in footnotes."
+  (interactive)
+  (message "getting links")
   (org-narrow-to-subtree)
   (let* ((parsetree (org-element-parse-buffer))
         (counter 0)
@@ -151,7 +153,12 @@ all keys and values are taken from properties."
            ;; urls with no content
            ((string-match "http" type)
             (format "<a href=\"%s\">%s</a> " (plist-get plist :raw-link) (plist-get plist :raw-link)))
-
+           ;; URLS with content
+           ((and (string-match "https" type) content)
+            (format "<a href=\"%s\">%s</a> " (plist-get plist :raw-link) content))
+           ;; urls with no content
+           ((string-match "https" type)
+            (format "<a href=\"%s\">%s</a> " (plist-get plist :raw-link) (plist-get plist :raw-link)))
            ;; all other links will be formatted as <pre> blocks on the raw link
            (t (format "<pre>%s</pre> " (plist-get plist :raw-link))))))))
     (widen)
