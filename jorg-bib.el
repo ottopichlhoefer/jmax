@@ -44,22 +44,22 @@
 
 (add-hook 'org-mode-hook 'org-mode-reftex-setup)
 
-(eval-after-load 'reftex-vars
-  '(progn
-     (add-to-list 'reftex-cite-format-builtin
-                  '(org "Org-mode citation"
-                        ((?\C-m . "cite:%l")
-			 (?h . "
-** TODO %y - %t
- :PROPERTIES:
-  :Custom_ID: %l
-  :AUTHOR: %a
-  :JOURNAL: %j
-  :YEAR: %y
-  :VOLUME: %v
-  :PAGES: %p
- :END:
-[[cite:%l]] [[file:~/Dropbox/bibliography/bibtex-pdfs/%l.pdf][pdf]]\n\n"))))))
+;; (eval-after-load 'reftex-vars
+;;   '(progn
+;;      (add-to-list 'reftex-cite-format-builtin
+;;                   '(org "Org-mode citation"
+;;                         ((?\C-m . "cite:%l")
+;; 			 (?h . "
+;; ** TODO %y - %t
+;;  :PROPERTIES:
+;;   :Custom_ID: %l
+;;   :AUTHOR: %a
+;;   :JOURNAL: %j
+;;   :YEAR: %y
+;;   :VOLUME: %v
+;;   :PAGES: %p
+;;  :END:
+;; [[cite:%l]] [[file:~/Dropbox/bibliography/bibtex-pdfs/%l.pdf][pdf]]\n\n"))))))
 
 ; " ; silly line to keep font highlighting working. apparently the previous code confuses the string boundaries.
 
@@ -71,8 +71,9 @@ the entry of interest. but does not check that."
   (bibtex-beginning-of-entry)
   ;; get the key. It should be everything between { and ,
   (re-search-forward "{\\([^,].*\\),") ; get the key
+  (message "found %s" (match-string 1))
   ;; it would also be nice to add a field with the path if it doesn't exist
-  (let ((pdf (format (concat jorg-bib-pdf-directory "%s.pdf" (match-string 1)))))
+  (let ((pdf (format (concat jorg-bib-pdf-directory "%s.pdf") (match-string 1))))
     (if (file-exists-p pdf)
       (org-open-link-from-string (format "[[file:%s]]" pdf))
       (ding))))
@@ -107,7 +108,7 @@ construct the heading by hand."
   (if (eq major-mode 'bibtex-mode)
       (progn
         (save-excursion
-          (jorg-bib/upload-bibtex-entry-to-citeulike) ; upload to citeulike. a little slow
+          ;(jorg-bib/upload-bibtex-entry-to-citeulike) ; upload to citeulike. a little slow
           (bibtex-beginning-of-entry)
           ;; get the key. It should be everything between { and ,
           (re-search-forward "{\\([^,].*\\),")
@@ -123,13 +124,16 @@ construct the heading by hand."
                (key (reftex-get-bib-field "=key=" entry))
                (journal (reftex-get-bib-field "journal" entry))
                (volume (reftex-get-bib-field "volume" entry))
-               (pages (reftex-get-bib-field "pages" entry)))
+               (pages (reftex-get-bib-field "pages" entry))
+               (doi (reftex-get-bib-field "doi" entry))
+               (url (reftex-get-bib-field "url" entry))
+               )
 
-                                        ; now look for entry
+          ;; now look for entry
           (find-file jorg-bib-bibliography-notes)
 
           (goto-char (point-min))
-                                        ; put new entry in notes if we don't find it.
+          ;; put new entry in notes if we don't find it.
           (unless (re-search-forward (format ":Custom_ID: %s$" key) nil 'end)
             (insert (format "\n** TODO %s - %s" year title))
             (insert (format"
@@ -140,12 +144,12 @@ construct the heading by hand."
   :YEAR: %s
   :VOLUME: %s
   :PAGES: %s
+  :DOI: %s
+  :URL: %s
  :END:
-[[cite:%s]] [[file:~/Dropbox/bibliography/bibtex-pdfs/%s.pdf][pdf]]\n\n"
-key author journal year volume pages key key)))))))
-;; " weird font lock issue
+[[cite:%s]] [[file:%s/%s.pdf][pdf]]\n\n"
+key author journal year volume pages doi url key jorg-bib-pdf-directory key )))))))
 
-; (reftex-citation nil 'h)
 (global-set-key [f11] 'open-bibtex-notes)
 (global-set-key [f12] 'open-bibtex-pdf)
 
