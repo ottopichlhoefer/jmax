@@ -11,3 +11,6 @@ auto-save-list
 ac-comphist.dat
 abbrev_defs
 .ispell
+org-mode*
+custom.el
+auto
