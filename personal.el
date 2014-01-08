@@ -27,9 +27,6 @@
    (insert region)
    (mail-to)))
 
-
-
-
 (setq inhibit-startup-screen t) ;; stop showing startup screen
 (tool-bar-mode 0)           ; remove the icons
 (menu-bar-mode 1)           ; keep the menus
@@ -73,8 +70,8 @@
         ("blog" . "~/Dropbox/blogofile-jkitchin.github.com/_blog/blog.org")
         ("ese" . "~/Dropbox/books/ese-book/ese.org" )
         ("pycse" . "~/Dropbox/books/pycse/pycse.org")
-        ("references" . "~/Box Sync/kitchingroup/bibliography/references.bib")
-        ("notes" . "~/Box Sync/kitchingroup/bibliography/notes.org")
+        ("references" . "~/Dropbox/bibliography/references.bib")
+        ("notes" . "~/Dropbox/bibliography/notes.org")
         ("journal" . "~/Dropbox/org-mode/journal.org")
         ("tasks" . "~/Dropbox/org-mode/tasks.org")
         ;; more here
@@ -176,9 +173,9 @@
 (setq reftex-default-bibliography '("~/Box Sync/kitchingroup/bibliography/references.bib"))
 
 ;; see jorg-bib.el for use of these variables
-(setq jorg-bib-bibliography-notes "~/Box Sync/kitchingroup/bibliography/notes.org")
-(setq jorg-bib-default-bibliography '("~/Box Sync/kitchingroup/bibliography/references.bib"))
-(setq jorg-bib-pdf-directory "~/Box Sync/kitchingroup/bibliography/bibtex-pdfs/")
+(setq jorg-bib-bibliography-notes "~/Dropbox/bibliography/notes.org"
+      jorg-bib-default-bibliography '("~/Dropbox/bibliography/references.bib")
+      jorg-bib-pdf-directory "~/Dropbox/bibliography/bibtex-pdfs/")
 
 ;;; http://www.masteringemacs.org/articles/2013/12/21/discoverel-discover-emacs-context-menus/
 ;(require 'makey)
