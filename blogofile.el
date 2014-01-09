@@ -339,4 +339,4 @@ would lead to this post filename
   (widen))
 
 
-(global-set-key [f10] 'bf-blogpost)
+(global-set-key [f8] 'bf-blogpost)
