@@ -44,41 +44,11 @@
 
 (add-hook 'org-mode-hook 'org-mode-reftex-setup)
 
-;; (eval-after-load 'reftex-vars
-;;   '(progn
-;;      (add-to-list 'reftex-cite-format-builtin
-;;                   '(org "Org-mode citation"
-;;                         ((?\C-m . "cite:%l")
-;; 			 (?h . "
-;; ** TODO %y - %t
-;;  :PROPERTIES:
-;;   :Custom_ID: %l
-;;   :AUTHOR: %a
-;;   :JOURNAL: %j
-;;   :YEAR: %y
-;;   :VOLUME: %v
-;;   :PAGES: %p
-;;  :END:
-;; [[cite:%l]] [[file:~/Dropbox/bibliography/bibtex-pdfs/%l.pdf][pdf]]\n\n"))))))
-
-; " ; silly line to keep font highlighting working. apparently the previous code confuses the string boundaries.
-
-
-(defun open-bibtex-pdf ()
-  "open pdf for a bibtex entry, if it exists. assumes point is in
-the entry of interest. but does not check that."
-  (interactive)
-  (bibtex-beginning-of-entry)
-  ;; get the key. It should be everything between { and ,
-  (re-search-forward "{\\([^,].*\\),") ; get the key
-  (message "found %s" (match-string 1))
-  ;; it would also be nice to add a field with the path if it doesn't exist
-  (let ((pdf (format (concat jorg-bib-pdf-directory "%s.pdf") (match-string 1))))
-    (if (file-exists-p pdf)
-      (org-open-link-from-string (format "[[file:%s]]" pdf))
-      (ding))))
-
-(require 'reftex-cite)
+(eval-after-load 'reftex-vars
+  '(progn
+      (add-to-list 'reftex-cite-format-builtin
+                   '(org "Org-mode citation"
+                         ((?\C-m . "cite:%l"))))))
 
 (defun jorg-bib/upload-bibtex-entry-to-citeulike ()
   "with point in  a bibtex entry get bibtex string and submit to citeulike.
@@ -95,7 +65,24 @@ Relies on the python script /upload_bibtex_citeulike.py being in the personal pr
       (with-temp-buffer (insert bibtex-string)
                         (shell-command-on-region (point-min) (point-max) script t nil nil t)))))
 
-(defun open-bibtex-notes ()
+(defun jorg-bib-open-bibtex-pdf ()
+  "open pdf for a bibtex entry, if it exists. assumes point is in
+the entry of interest. but does not check that."
+  (interactive)
+  (save-excursion
+    (bibtex-beginning-of-entry)
+    (let* ((bibtex-expand-strings t)
+           (entry (bibtex-parse-entry t))
+           (key (reftex-get-bib-field "=key=" entry))
+           (pdf (format (concat jorg-bib-pdf-directory "%s.pdf") key)))
+      (message "%s" pdf)
+      (if (file-exists-p pdf)
+          (org-open-link-from-string (format "[[file:%s]]" pdf))
+        (ding)))))
+
+(require 'reftex-cite)
+
+(defun jorg-bib-open-bibtex-notes ()
   "from a bibtex entry, open the notes if they exist, and create a heading if they do not.
 
 I never did figure out how to use reftex to make this happen
@@ -107,13 +94,6 @@ construct the heading by hand."
   (interactive)
   (if (eq major-mode 'bibtex-mode)
       (progn
-        (save-excursion
-          ;(jorg-bib/upload-bibtex-entry-to-citeulike) ; upload to citeulike. a little slow
-          (bibtex-beginning-of-entry)
-          ;; get the key. It should be everything between { and ,
-          (re-search-forward "{\\([^,].*\\),")
-          (setq key (match-string-no-properties 1))
-          )
         (bibtex-beginning-of-entry)
         (let* ((cb (current-buffer))
                (bibtex-expand-strings t)
@@ -150,8 +130,30 @@ construct the heading by hand."
 [[cite:%s]] [[file:%s/%s.pdf][pdf]]\n\n"
 key author journal year volume pages doi url key jorg-bib-pdf-directory key )))))))
 
-(global-set-key [f11] 'open-bibtex-notes)
-(global-set-key [f12] 'open-bibtex-pdf)
+
+(defun jorg-bib-open-in-browser ()
+  "Open the bibtex entry at point in a browser using the url field or doi field"
+(interactive)
+(save-excursion
+  (bibtex-beginning-of-entry)
+  (catch 'done
+    (let ((url (bibtex-autokey-get-field "url")))
+      (when  url
+        (browse-url url)
+        (throw 'done nil)))
+
+    (let ((doi (bibtex-autokey-get-field "doi")))
+      (when doi
+        (if (string-match "^http" doi)
+            (browse-url doi)
+          (browse-url (format "http://dx.doi.org/%s" doi)))
+        (throw 'done nil)))
+
+    (message "No url or doi found"))))
+
+(global-set-key [f10] 'jorg-bib-open-bibtex-notes)
+(global-set-key [f11] 'jorg-bib-open-bibtex-pdf)
+(global-set-key [f12] 'jorg-bib-open-in-browser)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; bibliography and bibliography style code
@@ -343,7 +345,7 @@ key author journal year volume pages doi url key jorg-bib-pdf-directory key ))))
   (message (format "found bibtex key: %s" bibtex-key))
   (message "%s" last-input-event)
   (let ((button (car last-input-event)))
-    (cond ((eq button 'mouse-2) 
+    (cond ((eq button 'mouse-2)
            ;; now we get the bibliography files
            (setq cite-bibliography-files (cite-find-bibliography))
            (message "cite-bibliography-files = %s" cite-bibliography-files)
@@ -358,7 +360,7 @@ key author journal year volume pages doi url key jorg-bib-pdf-directory key ))))
            (recenter-top-bottom 1))
 
           ;; if you right clicked, open the pdf. point is in the bibtex entry.
-          ((eq button 'mouse-3) 
+          ((eq button 'mouse-3)
                (let ((pdf (format (concat jorg-bib-pdf-directory "%s.pdf") bibtex-key)))
                  (if (file-exists-p pdf)
                      (org-open-link-from-string (format "[[file:%s]]" pdf))
