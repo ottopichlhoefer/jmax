@@ -1,0 +1,27 @@
+#+TITLE: Meine Präsentation
+[[elisp:org-show-mode]]
+elisp:org-show-start-slideshow
+
+
+* Title slide							      :slide:
+#+BEGIN_SRC emacs-lisp-slide
+(org-show-animate '("Willkommen zu diesem wichtigen Vortrag" "Otto Pichlhöfer"))
+#+END_SRC
+
+
+* Eins Zwei Drei						      :slide:
+  *Mein Text*
+  1. und das
+  2. und das
+  3. und auch
+  4. un weiter
+     | eins | zwei  | drei | vier    |
+     |------+-------+------+---------|
+     | Otto | Irene | Maya | Rita    |
+     | aber | ja    | na-  | türlich |
+  5. und auch
+  6. des weitren
+* Vier								      :slide:
+  da schreibe ich auch
+* Fünf								      :slide:
+  …und auch hier!

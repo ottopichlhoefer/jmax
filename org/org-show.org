@@ -15,7 +15,7 @@ http://orgmode.org/worg/org-tutorials/non-beamer-presentations.html#sec-3
 
 The one I like the best is discussed here: http://sachachua.com/blog/2013/04/how-to-present-using-org-mode-in-emacs/. I like it best because you can edit the slides as you go, execute arbitrary emacs code, and it is still pretty simple. I used Sacha's code as the basis for org-show. There is a lot of similarity.
 
-elisp:org-show-mode
+[[elisp:org-show-mode]]
 
 elisp:org-show-start-slideshow
 
