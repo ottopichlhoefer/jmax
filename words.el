@@ -197,6 +197,19 @@ Suggestions: %s
 			    (region-beginning)
 			    (region-end)))
       (thing-at-point 'word)))))
+
+
+(defun words-arxiv ()
+  "Search region or word at point in arxiv.org"
+  (interactive)
+  (browse-url
+   (format
+    "http://arxiv.org/find/all/1/all:+AND+%s/0/1/0/all/0/1"
+    (if (use-region-p)
+	(url-hexify-string (buffer-substring
+			    (region-beginning)
+			    (region-end)))
+      (thing-at-point 'word)))))
 ;; #+end_src
 
 ;; ** Convenience functions for scientific queries
@@ -349,7 +362,7 @@ end tell")))
 (key-chord-mode 1)
 (key-chord-define-global
  "ww"
- (defhydra words-hydra (global-map "<f2>")
+ (defhydra words-hydra (:color blue)
    "words"
    ("d" words-dictionary "dictionary")
    ("t" words-thesaurus "thesaurus")
@@ -361,11 +374,11 @@ end tell")))
    ("c" words-crossref "CrossRef")
    ("s" words-scopus "Scopus")
    ("p" words-pubmed "Pubmed")
+   ("a" words-arxiv "Arxiv")
    ("b" words-bibtex "bibtex")
    ("f" words-finder "Mac Finder")
    ("m" words-mdfind "mdfind")
    ("q" nil "cancel")))
-
 ;; #+END_SRC
 
 ;;; End:

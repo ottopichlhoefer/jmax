@@ -14,25 +14,26 @@
 
 (setq package-user-dir (expand-file-name "elpa"  starter-kit-dir))
 
-;; we need this specific version of highlight-indentation
+;; we need this specific version of highlight-indentation. This is a little
+;; hackery to make sure we get the version from the elpy repo.
 (unless (file-directory-p (expand-file-name "elpa/highlight-indentation-0.5.0" starter-kit-dir))
   (let ((package-archives '(("elpy" . "http://jorgenschaefer.github.io/packages/"))))
-  (package-initialize)
-  (package-refresh-contents)
-  (package-install 'highlight-indentation))
-  )
+    (package-initialize)
+    (package-refresh-contents)
+    (package-install 'highlight-indentation)))
 
 (package-initialize)
 
 (defvar starter-kit-packages
   (list 'flx-ido 'ido-ubiquitous 'smex
+	'dired-details 'dired-details+
         'yasnippet
         'magit
         'auctex 'reftex
         'undo-tree
 	'diminish
 	'eimp
-	'elpy
+	'elpy 'pydoc
 	'org-plus-contrib
 	'jedi 'jedi-direx
 	'helm 'helm-themes 'helm-bibtex
@@ -44,6 +45,7 @@
 	'ace-jump-mode 'ace-isearch
 	'use-package
 	'hydra 'key-chord
+	'git-timemachine
 	)
   "Libraries that should be installed by default.")
 
