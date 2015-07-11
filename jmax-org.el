@@ -2,7 +2,7 @@
 
 ;;; Commentary:
 ;;
-
+(require 'org)
 (require 'ox-beamer)
 (require 'ox-texinfo)
 (require 'ox-org)
@@ -377,35 +377,36 @@ citecolor=blue,filecolor=blue,menucolor=blue,urlcolor=blue"
 
 ;; * org-require
 ;;;;;;; org path for loadable org-files
-(defvar org-load-path
-  (list (file-name-as-directory
-	 (expand-file-name "org" starter-kit-dir)))
-  "List of directories to find org-files that `org-babel-load-file' can load code from.")
+;; (defvar org-load-path
+;;   (list (file-name-as-directory
+;;	 (expand-file-name "org" starter-kit-dir)))
+;;   "List of directories to find org-files that `org-babel-load-file' can load code from.")
 
-(defun org-require (feature)
-  "Load a FEATURE from an org-file.
-FEATURE is a symbol, and it is loaded from an org-file by the name of FEATURE.org, that is in the `org-load-path'.  The FEATURE is loaded from `org-babel-load-file'."
-  (let ((org-file (concat (symbol-name feature) ".org"))
-	(path))
+;; (defun org-require (feature)
+;;   "Load a FEATURE from an org-file.
+;; FEATURE is a symbol, and it is loaded from an org-file by the name of FEATURE.org, that is in the `org-load-path'.  The FEATURE is loaded from `org-babel-load-file'."
+;;   (let ((org-file (concat (symbol-name feature) ".org"))
+;;	(path))
 
-    ;; find the org-file
-    (catch 'result
-      (loop for dir in org-load-path do
-	    (when (file-exists-p
-		   (setq path
-			 (expand-file-name
-			  org-file
-			  dir)))
-	      (throw 'result path))))
-    (let ((default-directory (file-name-directory path)))
-      (org-babel-load-file path))))
+;;     ;; find the org-file
+;;     (catch 'result
+;;       (loop for dir in org-load-path do
+;;	    (when (file-exists-p
+;;		   (setq path
+;;			 (expand-file-name
+;;			  org-file
+;;			  dir)))
+;;	      (throw 'result path))))
+;;     (let ((default-directory (file-name-directory path)))
+;;       (org-babel-load-file path))))
 
-(org-require 'org-show)
+;; (org-require 'org-show)
+(add-to-list 'load-path
+	     (expand-file-name "org" starter-kit-dir))
+
+(require 'org-show)
 
 ;; https://github.com/jkitchin/org-ref
-(add-to-list 'org-load-path
-	     (expand-file-name "org-ref" starter-kit-dir))
-
 (add-to-list 'load-path
 	     (expand-file-name "org-ref" starter-kit-dir))
 
@@ -463,7 +464,8 @@ FEATURE is a symbol, and it is loaded from an org-file by the name of FEATURE.or
 ;; * Python sessions
 (defun org-babel-python-strip-session-chars ()
   "Remove >>> and ... from a Python session output."
-  (when (and (string=
+  (when (and (org-element-property :parameters (org-element-at-point))
+	     (string=
 	      "python"
 	      (org-element-property :language (org-element-at-point)))
 	     (string-match
@@ -486,6 +488,113 @@ FEATURE is a symbol, and it is loaded from an org-file by the name of FEATURE.or
 	    (kill-line)))))))
 
 (add-hook 'org-babel-after-execute-hook 'org-babel-python-strip-session-chars)
+
+;; * Restarting an org-babel session
+
+(defun src-block-in-session-p (&optional name)
+  "Return if src-block is in a session of NAME.
+NAME may be nil for unnamed sessions."
+  (let* ((info (org-babel-get-src-block-info))
+         (lang (nth 0 info))
+         (body (nth 1 info))
+         (params (nth 2 info))
+         (session (cdr (assoc :session params))))
+
+    (cond
+     ;; unnamed session, both name and session are nil
+     ((and (null session)
+	   (null name))
+      t)
+     ;; Matching name and session
+     ((and
+       (stringp name)
+       (stringp session)
+       (string= name session))
+      t)
+     ;; no match
+     (t nil))))
+
+(defun org-babel-restart-session-to-point (&optional arg)
+  "Restart session up to the src-block in the current point.
+Goes to beginning of buffer and executes each code block with
+`org-babel-execute-src-block' that has the same language and
+session as the current block. ARG has same meaning as in
+`org-babel-execute-src-block'."
+  (interactive "P")
+  (unless (org-in-src-block-p)
+    (error "You must be in a src-block to run this command"))
+  (org-babel-kill-session)
+  (let* ((current-point (point-marker))
+	 (info (org-babel-get-src-block-info))
+         (lang (nth 0 info))
+         (params (nth 2 info))
+         (session (cdr (assoc :session params))))
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward org-babel-src-block-regexp nil t)
+	;; goto start of block
+        (goto-char (match-beginning 0))
+	(let* ((this-info (org-babel-get-src-block-info))
+	       (this-lang (nth 0 this-info))
+	       (this-params (nth 2 this-info))
+	       (this-session (cdr (assoc :session this-params))))
+	    (when
+		(and
+		 (< (point) (marker-position current-point))
+		 (string= lang this-lang)
+		 (src-block-in-session-p session))
+	      (org-babel-execute-src-block arg)))
+	;; move forward so we can find the next block
+	(forward-line)))))
+
+(defun org-babel-kill-session ()
+  "Kill session for current code block."
+  (interactive)
+  (unless (org-in-src-block-p)
+    (error "You must be in a src-block to run this command"))
+  (save-window-excursion
+    (org-babel-switch-to-session)
+    (kill-buffer)))
+
+(defun org-babel-remove-result-buffer ()
+  "Remove results from every code block in buffer."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward org-babel-src-block-regexp nil t)
+      (org-babel-remove-result))))
+
+;; (defun org-babel-restart-session-to-point ()
+;;   "Restart session up to the src-block in the current point.
+;; Goes to beginning of buffer and executes each code block that has
+;; the same language and session as the current block."
+;;   (interactive)
+;;   (unless (org-in-src-block-p)
+;;     (error "You must be in a src-block to run this command"))
+;;   (let* ((current-point (point))
+;;	 (info (org-babel-get-src-block-info))
+;;          (lang (nth 0 info))
+;;          (body (nth 1 info))
+;;          (params (nth 2 info))
+;;          (session (cdr (assoc :session params))))
+;;     (save-excursion
+;;       (org-element-map
+;;	  (org-element-parse-buffer)
+;;	  'src-block
+;;	(lambda (block)
+;;	  (goto-char (org-element-property :begin block))
+
+;;	  (let* ((this-info (org-babel-get-src-block-info))
+;;		 (this-lang (nth 0 this-info))
+;;		 (this-body (nth 1 this-info))
+;;		 (this-params (nth 2 this-info))
+;;		 (this-session (cdr (assoc :session this-params))))
+;;	    (when
+;;		(and
+;;		 (< (point) current-point)
+;;		 (string= lang this-lang)
+;;		 (src-block-in-session-p session))
+;;	      (org-babel-execute-maybe))))))))
 ;; * Miscellaneous
 (defun sa-ignore-headline (contents backend info)
   "Ignore headlines with tag `ignoreheading'.
